@@ -24,7 +24,7 @@ def decide_action(fill_percent, weight_kg):
         return "FULL_LIGHT", "ACTIVATE_COMPACTOR"
     return "NORMAL", "NONE"
 
-client = mqtt.Client()
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.connect(BROKER, PORT, 60)
 
 while True:
