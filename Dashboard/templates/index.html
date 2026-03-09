@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Bin Dashboard</title>
+    <meta http-equiv="refresh" content="2">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Bin Dashboard</h1>
+
+        <div class="card">
+            <h2>Bin Information</h2>
+            <p><strong>Bin ID:</strong> {{ data.bin_id }}</p>
+            <p><strong>Distance:</strong> {{ data.distance_cm }} cm</p>
+            <p><strong>Weight:</strong> {{ data.weight_kg }} kg</p>
+            <p><strong>Fill Level:</strong> {{ data.fill_percent }}%</p>
+            <p><strong>Status:</strong> {{ data.status }}</p>
+            <p><strong>Action:</strong> {{ data.action }}</p>
+            <p><strong>Last Updated:</strong> {{ data.timestamp }}</p>
+        </div>
+
+        {% if data.action == "NOTIFY_CLEAR_BIN" %}
+            <div class="alert red">Alert: Bin is full and heavy. Please clear the bin.</div>
+        {% elif data.action == "ACTIVATE_COMPACTOR" %}
+            <div class="alert orange">Action: Bin looks full but light. Compactor should activate.</div>
+        {% else %}
+            <div class="alert green">System normal.</div>
+        {% endif %}
+    </div>
+</body>
+</html>
