@@ -1,5 +1,5 @@
 from flask import Flask, render_template
-from Dashboard.mqtt_listener import start_mqtt, latest_data
+from mqtt_listener import start_mqtt, latest_data
 
 app = Flask(__name__)
 
