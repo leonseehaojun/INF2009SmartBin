@@ -2,17 +2,14 @@ import json
 import threading
 import paho.mqtt.client as mqtt
 
-BROKER = "127.0.0.1"
+BROKER = "10.239.18.26"   # use Pi IP here if app runs on laptop
 PORT = 1883
-TOPIC = "smartbin/bin01/all"
+TOPIC = "smartbin/sensors"
 
 latest_data = {
-    "bin_id": "bin01",
+    "pir": "-",
+    "weight_g": "-",
     "distance_cm": "-",
-    "weight_kg": "-",
-    "fill_percent": "-",
-    "status": "WAITING",
-    "action": "NONE",
     "timestamp": "-"
 }
 
@@ -26,6 +23,15 @@ def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
         latest_data.update(payload)
+
+        pir_value = payload.get("pir", "-")
+        if pir_value == 1:
+            latest_data["pir_status"] = "Motion Detected"
+        elif pir_value == 0:
+            latest_data["pir_status"] = "No Motion"
+        else:
+            latest_data["pir_status"] = "Unknown"
+            
         print("Received message:", latest_data)
     except Exception as e:
         print("Error reading MQTT message:", e)
