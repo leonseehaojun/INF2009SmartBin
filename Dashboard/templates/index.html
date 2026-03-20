@@ -8,28 +8,90 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    {% set fill = data.fill_percent if data.fill_percent is number else 0 %}
+    {% if fill >= 80 %}
+        {% set fill_color = "#e53935" %}
+        {% set fill_glow = "rgba(229,57,53,0.3)" %}
+    {% elif fill >= 50 %}
+        {% set fill_color = "#fb8c00" %}
+        {% set fill_glow = "rgba(251,140,0,0.3)" %}
+    {% else %}
+        {% set fill_color = "#43a047" %}
+        {% set fill_glow = "rgba(67,160,71,0.3)" %}
+    {% endif %}
+
     <div class="container">
         <h1>Smart Bin Dashboard</h1>
 
-        <div class="card">
-            <h2>Bin Information</h2>
-            <p><strong>Bin ID:</strong> {{ data.bin_id }}</p>
-            <p><strong>Distance:</strong> {{ data.distance_cm }} cm</p>
-            <p><strong>PIR:</strong> {{ data.pir_status }}</p>
-            <p><strong>Weight:</strong> {{ data.weight_g }} g</p>
-            <p><strong>Fill Level:</strong> {{ data.fill_percent }}%</p>
-            <p><strong>Status:</strong> {{ data.status }}</p>
-            <p><strong>Action:</strong> {{ data.action }}</p>
-            <p><strong>Last Updated:</strong> {{ data.timestamp }}</p>
+        <div class="bin-card">
+            <div class="bin-visual">
+                <svg viewBox="0 0 200 280" width="180">
+                    <!-- handle -->
+                    <path d="M 80 44 Q 80 26 100 26 Q 120 26 120 44"
+                          fill="none" stroke="#555" stroke-width="5" stroke-linecap="round"/>
+                    <!-- lid -->
+                    <rect x="28" y="44" width="144" height="22" rx="6" fill="#6d6d6d"/>
+                    <!-- bin body (trapezoid) -->
+                    <path d="M 38 66 L 50 248 Q 52 262 64 262 L 136 262 Q 148 262 150 248 L 162 66 Z"
+                          fill="#e8e8e8" stroke="#6d6d6d" stroke-width="3.5"/>
+                    <!-- fill clipped to bin shape -->
+                    <defs>
+                        <clipPath id="bin-clip">
+                            <path d="M 38 66 L 50 248 Q 52 262 64 262 L 136 262 Q 148 262 150 248 L 162 66 Z"/>
+                        </clipPath>
+                        <linearGradient id="fill-grad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="{{ fill_color }}" stop-opacity="0.7"/>
+                            <stop offset="100%" stop-color="{{ fill_color }}" stop-opacity="1"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="36" y="{{ 262 - (fill * 1.96)|round|int }}"
+                          width="128" height="{{ (fill * 1.96)|round|int }}"
+                          fill="url(#fill-grad)" clip-path="url(#bin-clip)"/>
+                    <!-- ridges -->
+                    <line x1="56" y1="110" x2="144" y2="110" stroke="#d0d0d0" stroke-width="1.5"/>
+                    <line x1="54" y1="154" x2="146" y2="154" stroke="#d0d0d0" stroke-width="1.5"/>
+                    <line x1="52" y1="198" x2="148" y2="198" stroke="#d0d0d0" stroke-width="1.5"/>
+                </svg>
+                <div class="bin-label" style="color: {{ fill_color }};">{{ fill }}%</div>
+            </div>
+
+            {% if data.action == "NOTIFY_CLEAR_BIN" %}
+                <div class="alert red">Bin is full and heavy — please clear the bin.</div>
+            {% elif data.action == "ACTIVATE_COMPACTOR" %}
+                <div class="alert orange">Bin looks full but light — compactor should activate.</div>
+            {% else %}
+                <div class="alert green">System normal</div>
+            {% endif %}
         </div>
 
-        {% if data.action == "NOTIFY_CLEAR_BIN" %}
-            <div class="alert red">Alert: Bin is full and heavy. Please clear the bin.</div>
-        {% elif data.action == "ACTIVATE_COMPACTOR" %}
-            <div class="alert orange">Action: Bin looks full but light. Compactor should activate.</div>
-        {% else %}
-            <div class="alert green">System normal.</div>
-        {% endif %}
+        <div class="info-grid">
+            <div class="info-tile">
+                <span class="tile-label">Bin ID</span>
+                <span class="tile-value">{{ data.bin_id }}</span>
+            </div>
+            <div class="info-tile">
+                <span class="tile-label">Distance</span>
+                <span class="tile-value">{{ data.distance_cm }} cm</span>
+            </div>
+            <div class="info-tile">
+                <span class="tile-label">Weight</span>
+                <span class="tile-value">{{ data.weight_g }} g</span>
+            </div>
+            <div class="info-tile">
+                <span class="tile-label">PIR</span>
+                <span class="tile-value">{{ data.pir_status }}</span>
+            </div>
+            <div class="info-tile">
+                <span class="tile-label">Status</span>
+                <span class="tile-value">{{ data.status }}</span>
+            </div>
+            <div class="info-tile">
+                <span class="tile-label">Action</span>
+                <span class="tile-value">{{ data.action }}</span>
+            </div>
+        </div>
+
+        <p class="timestamp">Last updated: {{ data.timestamp }}</p>
     </div>
 </body>
 </html>
