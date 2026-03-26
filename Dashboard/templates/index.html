@@ -82,6 +82,16 @@
                 <span class="tile-value">{{ data.pir_status }}</span>
             </div>
             <div class="info-tile">
+                <span class="tile-label">Predicted Time to Full</span>
+                <span class="tile-value">
+                    {% if data.predicted_time_to_full_minutes != "-" %}
+                        {{ data.predicted_time_to_full_minutes }} min
+                    {% else %}
+                        -
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-tile">
                 <span class="tile-label">Status</span>
                 <span class="tile-value">{{ data.status }}</span>
             </div>
