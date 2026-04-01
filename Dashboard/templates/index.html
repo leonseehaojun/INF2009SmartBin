@@ -4,20 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Bin Dashboard</title>
-    <meta http-equiv="refresh" content="2">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    {% set fill = data.fill_percent if data.fill_percent is number else 0 %}
+    {% set fill = data.fill_percent|float %}
     {% if fill >= 80 %}
         {% set fill_color = "#e53935" %}
-        {% set fill_glow = "rgba(229,57,53,0.3)" %}
     {% elif fill >= 50 %}
         {% set fill_color = "#fb8c00" %}
-        {% set fill_glow = "rgba(251,140,0,0.3)" %}
     {% else %}
         {% set fill_color = "#43a047" %}
-        {% set fill_glow = "rgba(67,160,71,0.3)" %}
     {% endif %}
 
     <div class="container">
@@ -26,64 +22,69 @@
         <div class="bin-card">
             <div class="bin-visual">
                 <svg viewBox="0 0 200 280" width="180">
-                    <!-- handle -->
                     <path d="M 80 44 Q 80 26 100 26 Q 120 26 120 44"
                           fill="none" stroke="#555" stroke-width="5" stroke-linecap="round"/>
-                    <!-- lid -->
+
                     <rect x="28" y="44" width="144" height="22" rx="6" fill="#6d6d6d"/>
-                    <!-- bin body (trapezoid) -->
+
                     <path d="M 38 66 L 50 248 Q 52 262 64 262 L 136 262 Q 148 262 150 248 L 162 66 Z"
                           fill="#e8e8e8" stroke="#6d6d6d" stroke-width="3.5"/>
-                    <!-- fill clipped to bin shape -->
+
                     <defs>
                         <clipPath id="bin-clip">
                             <path d="M 38 66 L 50 248 Q 52 262 64 262 L 136 262 Q 148 262 150 248 L 162 66 Z"/>
                         </clipPath>
                         <linearGradient id="fill-grad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stop-color="{{ fill_color }}" stop-opacity="0.7"/>
-                            <stop offset="100%" stop-color="{{ fill_color }}" stop-opacity="1"/>
+                            <stop id="fill-stop-top" offset="0%" stop-color="{{ fill_color }}" stop-opacity="0.7"/>
+                            <stop id="fill-stop-bottom" offset="100%" stop-color="{{ fill_color }}" stop-opacity="1"/>
                         </linearGradient>
                     </defs>
-                    <rect x="36" y="{{ 262 - (fill * 1.96)|round|int }}"
-                          width="128" height="{{ (fill * 1.96)|round|int }}"
-                          fill="url(#fill-grad)" clip-path="url(#bin-clip)"/>
-                    <!-- ridges -->
+
+                    <rect id="fill-rect"
+                          x="36"
+                          y="{{ 262 - (fill * 1.96)|round|int }}"
+                          width="128"
+                          height="{{ (fill * 1.96)|round|int }}"
+                          fill="url(#fill-grad)"
+                          clip-path="url(#bin-clip)"/>
+
                     <line x1="56" y1="110" x2="144" y2="110" stroke="#d0d0d0" stroke-width="1.5"/>
                     <line x1="54" y1="154" x2="146" y2="154" stroke="#d0d0d0" stroke-width="1.5"/>
                     <line x1="52" y1="198" x2="148" y2="198" stroke="#d0d0d0" stroke-width="1.5"/>
                 </svg>
-                <div class="bin-label" style="color: {{ fill_color }};">{{ fill }}%</div>
+
+                <div class="bin-label" id="fill-label" style="color: {{ fill_color }};">{{ fill }}%</div>
             </div>
 
-            {% if data.action == "NOTIFY_CLEAR_BIN" %}
-                <div class="alert red">Bin is full and heavy — please clear the bin.</div>
+            {% if data.action == "CLEAR NOW" %}
+                <div class="alert red" id="alert-box">Bin is full — clear now.</div>
             {% elif data.action == "ACTIVATE_COMPACTOR" %}
-                <div class="alert orange">Bin looks full but light — compactor should activate.</div>
+                <div class="alert orange" id="alert-box">Bin looks full but light — compactor should activate.</div>
             {% else %}
-                <div class="alert green">System normal</div>
+                <div class="alert green" id="alert-box">System normal</div>
             {% endif %}
         </div>
 
         <div class="info-grid">
             <div class="info-tile">
                 <span class="tile-label">Bin ID</span>
-                <span class="tile-value">{{ data.bin_id }}</span>
+                <span class="tile-value" id="bin-id-value">{{ data.bin_id }}</span>
             </div>
             <div class="info-tile">
                 <span class="tile-label">Distance</span>
-                <span class="tile-value">{{ data.distance_cm }} cm</span>
+                <span class="tile-value" id="distance-value">{{ data.distance_cm }} cm</span>
             </div>
             <div class="info-tile">
                 <span class="tile-label">Weight</span>
-                <span class="tile-value">{{ data.weight_g }} g</span>
+                <span class="tile-value" id="weight-value">{{ data.weight_g }} g</span>
             </div>
             <div class="info-tile">
                 <span class="tile-label">PIR</span>
-                <span class="tile-value">{{ data.pir_status }}</span>
+                <span class="tile-value" id="pir-value">{{ data.pir_status }}</span>
             </div>
             <div class="info-tile">
                 <span class="tile-label">Predicted Time to Full</span>
-                <span class="tile-value">
+                <span class="tile-value" id="predicted-value">
                     {% if data.predicted_time_to_full_minutes != "-" %}
                         {{ data.predicted_time_to_full_minutes }} min
                     {% else %}
@@ -93,15 +94,84 @@
             </div>
             <div class="info-tile">
                 <span class="tile-label">Status</span>
-                <span class="tile-value">{{ data.status }}</span>
+                <span class="tile-value" id="status-value">{{ data.status }}</span>
             </div>
             <div class="info-tile">
                 <span class="tile-label">Action</span>
-                <span class="tile-value">{{ data.action }}</span>
+                <span class="tile-value" id="action-value">{{ data.action }}</span>
             </div>
         </div>
 
-        <p class="timestamp">Last updated: {{ data.timestamp }}</p>
+        <p class="timestamp" id="timestamp-value">Last updated: {{ data.timestamp }}</p>
     </div>
+
+    <script>
+        function getFillColor(fill) {
+            if (fill >= 80) return "#e53935";
+            if (fill >= 50) return "#fb8c00";
+            return "#43a047";
+        }
+
+        function updateAlert(action) {
+            const alertBox = document.getElementById("alert-box");
+
+            if (action === "CLEAR NOW") {
+                alertBox.className = "alert red";
+                alertBox.textContent = "Bin is full — clear now.";
+            } else if (action === "ACTIVATE_COMPACTOR") {
+                alertBox.className = "alert orange";
+                alertBox.textContent = "Bin looks full but light — compactor should activate.";
+            } else {
+                alertBox.className = "alert green";
+                alertBox.textContent = "System normal";
+            }
+        }
+        
+        async function updateDashboard() {
+            try {
+                const response = await fetch("/api/data");
+                const data = await response.json();
+
+                document.getElementById("bin-id-value").textContent = data.bin_id ?? "-";
+                document.getElementById("distance-value").textContent = (data.distance_cm ?? "-") + " cm";
+                document.getElementById("weight-value").textContent = (data.weight_g ?? "-") + " g";
+                document.getElementById("pir-value").textContent = data.pir_status ?? "-";
+                document.getElementById("status-value").textContent = data.status ?? "-";
+                document.getElementById("action-value").textContent = data.action ?? "-";
+                document.getElementById("timestamp-value").textContent = "Last updated: " + (data.timestamp ?? "-");
+
+                const predictedText =
+                    data.predicted_time_to_full_minutes !== "-" &&
+                    data.predicted_time_to_full_minutes !== null
+                        ? data.predicted_time_to_full_minutes + " min"
+                        : "-";
+                document.getElementById("predicted-value").textContent = predictedText;
+
+                let fill = Number(data.fill_percent);
+                if (isNaN(fill)) fill = 0;
+
+                const fillColor = getFillColor(fill);
+
+                document.getElementById("fill-label").textContent = fill.toFixed(1) + "%";
+                document.getElementById("fill-label").style.color = fillColor;
+
+                const fillHeight = Math.round(fill * 1.96);
+                const fillY = 262 - fillHeight;
+
+                const fillRect = document.getElementById("fill-rect");
+                fillRect.setAttribute("y", fillY);
+                fillRect.setAttribute("height", fillHeight);
+
+                document.getElementById("fill-stop-top").setAttribute("stop-color", fillColor);
+                document.getElementById("fill-stop-bottom").setAttribute("stop-color", fillColor);
+
+                updateAlert(data.action);
+            } catch (err) {
+                console.error("Failed to update dashboard:", err);
+            }
+        }
+
+        setInterval(updateDashboard, 10000);
+    </script>
 </body>
 </html>

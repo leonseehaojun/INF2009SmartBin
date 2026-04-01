@@ -9,26 +9,38 @@ import pandas as pd
 import joblib
 import paho.mqtt.client as mqtt
 
-BROKER = "10.81.174.26"   # Pi IP if app runs on laptop
+BROKER = "10.129.244.26"   # Pi IP if app runs on laptop
 PORT = 1883
 TOPIC = "smartbin/sensors"
 
-# -------------------------
-# ML model load
-# -------------------------
-MODEL_BUNDLE = joblib.load("time_to_full_model.joblib")
-MODEL = MODEL_BUNDLE["model"]
-MODEL_FEATURES = MODEL_BUNDLE["features"]
-
-# -------------------------
-# Config
-# -------------------------
+MODEL_FILE = "time_to_full_model2.joblib"
 LOG_FILE = "live_sensor_log.csv"
-HISTORY = deque(maxlen=6)   # 6 readings = 30 min if sampling every 5 min
-last_history_time = None
 
 EMPTY_DISTANCE_CM = 12.0
-FULL_DISTANCE_CM = 2.0
+FULL_DISTANCE_CM = 1.0
+
+HISTORY = deque(maxlen=6)
+last_history_time = None
+HISTORY_INTERVAL_SECONDS = 5
+
+FEATURES = [
+    "distance_cm",
+    "weight_g",
+    "pir",
+    "fill_percent",
+    "hour",
+    "day_of_week",
+    "minute_of_day",
+    "delta_fill_3",
+    "delta_weight_3",
+    "pir_recent_3",
+    "fill_rate_15m",
+    "fill_rate_30m",
+    "weight_rate_15m",
+    "weight_rate_30m",
+    "pir_count_15m",
+    "pir_count_30m",
+]
 
 latest_data = {
     "bin_id": "bin01",
@@ -42,6 +54,18 @@ latest_data = {
     "action": "NONE",
     "timestamp": "-"
 }
+
+model_lock = threading.Lock()
+
+if os.path.exists(MODEL_FILE):
+    MODEL_BUNDLE = joblib.load(MODEL_FILE)
+    MODEL = MODEL_BUNDLE["model"]
+    MODEL_FEATURES = MODEL_BUNDLE["features"]
+    print(f"Loaded model from {MODEL_FILE}")
+else:
+    MODEL = None
+    MODEL_FEATURES = FEATURES
+    print(f"Model file {MODEL_FILE} not found. Live prediction disabled.")
 
 def calc_fill_percent(distance_cm):
     if distance_cm is None:
@@ -58,6 +82,11 @@ def append_csv(row):
         writer.writerow(row)
 
 def build_prediction():
+    global MODEL, MODEL_FEATURES
+
+    if MODEL is None:
+        return None
+
     if len(HISTORY) < 6:
         return None
 
@@ -99,7 +128,9 @@ def build_prediction():
         "pir_count_30m": pir_count_30m,
     }])
 
-    pred = MODEL.predict(row[MODEL_FEATURES])[0]
+    with model_lock:
+        pred = MODEL.predict(row[MODEL_FEATURES])[0]
+
     return float(pred)
 
 def on_connect(client, userdata, flags, rc):
@@ -116,13 +147,13 @@ def on_message(client, userdata, msg):
         weight_g = payload.get("weight_g")
         distance_cm = payload.get("distance_cm")
         timestamp_str = payload.get("timestamp", "-")
+        status = payload.get("status", "NORMAL")
+        action = payload.get("action", "NONE")
 
-        # reject incomplete messages
         if weight_g is None or distance_cm is None:
             print("Skipping incomplete payload:", payload)
             return
 
-        # parse timestamp
         try:
             dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
         except Exception:
@@ -133,13 +164,12 @@ def on_message(client, userdata, msg):
         distance_cm = float(distance_cm)
         fill_percent = calc_fill_percent(distance_cm)
 
-        # only store one reading every 5 minutes for ML history
         should_store = False
         if last_history_time is None:
             should_store = True
         else:
             elapsed = (dt - last_history_time).total_seconds()
-            if elapsed >= 5:
+            if elapsed >= HISTORY_INTERVAL_SECONDS:
                 should_store = True
 
         if should_store:
@@ -152,10 +182,8 @@ def on_message(client, userdata, msg):
             })
             last_history_time = dt
 
-        # run prediction when enough history exists
         predicted_minutes = build_prediction()
 
-        # PIR text
         if pir_value == 1:
             pir_status = "Motion Detected"
         elif pir_value == 0:
@@ -163,7 +191,6 @@ def on_message(client, userdata, msg):
         else:
             pir_status = "Unknown"
 
-        # update dashboard state
         latest_data.update({
             "pir": pir_value,
             "pir_status": pir_status,
@@ -171,23 +198,25 @@ def on_message(client, userdata, msg):
             "distance_cm": round(distance_cm, 2),
             "fill_percent": round(float(fill_percent), 1),
             "predicted_time_to_full_minutes": round(predicted_minutes, 1) if predicted_minutes is not None else "-",
-            "status": "NORMAL",
-            "action": "NONE",
+            "status": status,
+            "action": action,
             "timestamp": timestamp_str
         })
 
-        # save every incoming reading to csv
         append_csv({
             "timestamp": timestamp_str,
             "pir": pir_value,
             "weight_g": round(weight_g, 2),
             "distance_cm": round(distance_cm, 2),
             "fill_percent": round(float(fill_percent), 1),
+            "status": status,
+            "action": action,
             "predicted_time_to_full_minutes": round(predicted_minutes, 1) if predicted_minutes is not None else ""
         })
 
         print("Received message:", latest_data)
         print(f"HISTORY size: {len(HISTORY)}")
+        print(f"Predicted minutes: {predicted_minutes}")
 
     except Exception as e:
         print("Error reading MQTT message:", e)
